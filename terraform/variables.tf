@@ -26,16 +26,9 @@ variable "rds_database" {
   default     = "oficina_db"
 }
 
-variable "rds_username" {
-  description = "Usuario de conexao com o banco de dados"
+variable "rds_secret_arn" {
+  description = "ARN do segredo no Secrets Manager com usuario/senha do RDS (obtido com: terraform output -raw DB_Secret_Arn em oficina-infra-database). Nao e sensivel - e so um identificador; o LabRole tem permissao de ler o valor em tempo de execucao."
   type        = string
-  default     = "postgres"
-}
-
-variable "rds_password" {
-  description = "Senha do banco de dados"
-  type        = string
-  sensitive   = true
 }
 
 variable "app_api_base_url" {

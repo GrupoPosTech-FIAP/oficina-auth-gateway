@@ -28,8 +28,7 @@ resource "aws_lambda_function" "auth_handler" {
       PGHOST                 = var.rds_endpoint
       PGPORT                 = "5432"
       PGDATABASE             = var.rds_database
-      PGUSER                 = var.rds_username
-      PGPASSWORD             = var.rds_password
+      RDS_SECRET_ARN         = var.rds_secret_arn
     }
   }
 
