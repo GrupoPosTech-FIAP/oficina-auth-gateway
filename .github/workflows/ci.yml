@@ -51,5 +51,8 @@ jobs:
       - name: Inicializar sem backend (só para validar sintaxe)
         run: terraform init -backend=false
 
+      - name: Criar zip placeholder (só existe pra "validate" checar a sintaxe)
+        run: mkdir -p ../build && touch ../build/lambda.zip
+
       - name: Validar configuração
         run: terraform validate
