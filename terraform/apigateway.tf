@@ -7,6 +7,57 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.auth_gateway.id
   name        = "$default"
   auto_deploy = true
+
+  # Defesa em profundidade contra varredura de CPFs em POST /auth, alem do
+  # rate limiting por IP feito no proprio auth-handler (DynamoDB): aqui e
+  # uma trava mais grosseira, na porta de entrada, que tambem protege as
+  # rotas protegidas de um flood generico.
+  default_route_settings {
+    throttling_burst_limit = 20
+    throttling_rate_limit  = 10
+  }
+
+  route_settings {
+    route_key              = aws_apigatewayv2_route.post_auth.route_key
+    throttling_burst_limit = 5
+    throttling_rate_limit  = 2
+  }
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_gw_access_logs.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      routeKey       = "$context.routeKey"
+      status         = "$context.status"
+      responseLength = "$context.responseLength"
+    })
+  }
+}
+
+resource "aws_cloudwatch_log_group" "api_gw_access_logs" {
+  name              = "/aws/apigateway/oficina-auth-gateway"
+  retention_in_days = 14
+}
+
+data "aws_iam_policy_document" "api_gw_logs" {
+  statement {
+    effect    = "Allow"
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["${aws_cloudwatch_log_group.api_gw_access_logs.arn}:*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["apigateway.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_cloudwatch_log_resource_policy" "api_gw_logs" {
+  policy_name     = "oficina-auth-gateway-apigw-logs"
+  policy_document = data.aws_iam_policy_document.api_gw_logs.json
 }
 
 # --- Rota publica: POST /auth (sem authorizer) ---

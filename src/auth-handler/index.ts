@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "
 import { isCpfValido, limparDocumento } from "../shared/cpf";
 import { buscarStatusClientePorDocumento } from "../shared/db";
 import { assinarToken } from "../shared/jwt";
+import { registrarTentativa } from "../shared/rateLimit";
 
 interface AuthRequestBody {
   cpf?: string;
@@ -16,6 +17,12 @@ function resposta(statusCode: number, body: Record<string, unknown>): APIGateway
 }
 
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyStructuredResultV2> {
+  const ipOrigem = event.requestContext?.http?.sourceIp ?? "desconhecido";
+  const limite = await registrarTentativa(ipOrigem);
+  if (!limite.permitido) {
+    return resposta(429, { message: "Muitas tentativas de autenticação. Tente novamente mais tarde." });
+  }
+
   let body: AuthRequestBody;
   try {
     body = event.body ? JSON.parse(event.body) : {};

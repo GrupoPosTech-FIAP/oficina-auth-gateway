@@ -51,12 +51,26 @@ flowchart LR
 | CPF não cadastrado | `404` | `{ "message": "Cliente não encontrado" }` |
 | Cliente inativo | `403` | `{ "message": "Cliente inativo" }` |
 | Cliente ativo | `200` | `{ "token": "<jwt>" }` |
+| Muitas tentativas do mesmo IP | `429` | `{ "message": "Muitas tentativas de autenticação. Tente novamente mais tarde." }` |
 
 ### Rotas protegidas — `ANY /app/{proxy+}`
 
 Repassa a requisição para a `oficina-app-api`, exigindo `Authorization: Bearer <token>` válido (emitido por `POST /auth`). Token ausente/inválido/expirado → `401`, sem chegar na aplicação.
 
 Uma coleção Bruno com exemplos de request para as duas rotas fica em [`test/bruno/`](test/bruno), no mesmo formato usado pela `oficina-app-api`.
+
+## Segurança: autenticar só com CPF é fraco por natureza
+
+O enunciado do desafio pede explicitamente esse modelo (CPF entra, JWT sai, sem senha/segundo fator). Vale registrar a limitação em vez de fingir que não existe: **CPF não é segredo** — aparece em nota fiscal, boleto, contrato — e o algoritmo de dígito verificador é público, então dá pra gerar candidatos válidos em sequência. O risco real é alguém varrer vários CPFs até achar um cadastrado e ativo, "virando" aquele cliente.
+
+Como isso não pode ser resolvido mudando o contrato da API (é o que o desafio pede), mitigamos em camadas:
+
+1. **Rate limiting por IP no `auth-handler`** (tabela DynamoDB `oficina-auth-rate-limit`, TTL) — no máximo `rate_limit_max_tentativas` chamadas a `POST /auth` por IP a cada `rate_limit_window_seconds`; acima disso, `429`. É a defesa mais direta contra a varredura de CPFs.
+2. **Throttling no próprio API Gateway** — limite mais grosseiro na borda (`route_settings` da rota `POST /auth`), complementar ao rate limiting acima.
+3. **Access logs em CloudWatch** (`/aws/apigateway/oficina-auth-gateway`) — sem isso ninguém percebe um ataque em andamento.
+4. **JWT de vida curta** (`jwt_expiration_seconds`, padrão 1h) — reduz a janela de uso de um token obtido indevidamente.
+
+**Não implementado, por limitação do ambiente (AWS Academy Learner Lab restringe serviços "avançados"), mas recomendado para um cenário real:** AWS WAF com regra de rate-based rule por IP (mais preciso que o throttling padrão do API Gateway, porque consegue bloquear por período mais longo) e algum tipo de verificação de "prova de posse" adicional (ex.: confirmar um código enviado por e-mail/SMS cadastrado do cliente antes de emitir o JWT) — isso sim mudaria o contrato, por isso ficou fora do escopo aqui.
 
 ## Rodando localmente
 

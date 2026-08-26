@@ -35,3 +35,15 @@ variable "app_api_base_url" {
   description = "Hostname do LoadBalancer da oficina-app-api no EKS (kubectl get svc oficina-api -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'). Muda a cada recriacao do Service."
   type        = string
 }
+
+variable "rate_limit_max_tentativas" {
+  description = "Numero maximo de chamadas a POST /auth aceitas por IP dentro da janela (rate_limit_window_seconds) antes de responder 429"
+  type        = string
+  default     = "10"
+}
+
+variable "rate_limit_window_seconds" {
+  description = "Duracao da janela de rate limiting por IP, em segundos"
+  type        = string
+  default     = "300"
+}
