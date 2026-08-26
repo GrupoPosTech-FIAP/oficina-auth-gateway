@@ -1,0 +1,15 @@
+meta {
+  name: Consultar cliente (rota protegida)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/app/cliente/{{cpfAtivo}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}

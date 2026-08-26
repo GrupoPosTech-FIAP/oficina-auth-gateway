@@ -1,0 +1,80 @@
+name: "CD - Deploy do Auth Gateway (AWS)"
+
+# Igual ao padrão já usado em oficina-infra-database e oficina-app-api:
+# acionamento manual, porque as credenciais do Learner Lab expiram em ~4h
+# e alguns valores (endpoint do RDS, hostname do LoadBalancer da app-api)
+# mudam a cada recriação desses recursos.
+on:
+  workflow_dispatch:
+    inputs:
+      TF_BUCKET_NAME:
+        description: "Bucket S3 do remote state (mesmo usado por oficina-infra-database)"
+        required: true
+      rds_endpoint:
+        description: "Endpoint do RDS (terraform output -raw DB_Endpoint em oficina-infra-database)"
+        required: true
+      app_api_base_url:
+        description: "Hostname do LoadBalancer da oficina-app-api (kubectl get svc oficina-api -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+        required: true
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Instalar dependências e compilar
+        run: |
+          npm ci
+          npm run build
+
+      - name: Reinstalar só dependências de produção (para o pacote da Lambda)
+        run: |
+          rm -rf node_modules
+          npm ci --omit=dev
+
+      - name: Empacotar Lambdas (dist/ + node_modules em build/lambda.zip)
+        run: |
+          mkdir -p build
+          cd dist && zip -r ../build/lambda.zip . && cd ..
+          zip -r build/lambda.zip node_modules
+
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init -backend-config="bucket=${{ inputs.TF_BUCKET_NAME }}"
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve \
+            -var="infra_state_bucket=${{ inputs.TF_BUCKET_NAME }}" \
+            -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
+            -var="rds_password=${{ secrets.RDS_PASSWORD }}" \
+            -var="rds_endpoint=${{ inputs.rds_endpoint }}" \
+            -var="app_api_base_url=${{ inputs.app_api_base_url }}"
+
+      - name: Mostrar URL do API Gateway
+        working-directory: terraform
+        run: terraform output -raw API_Gateway_URL

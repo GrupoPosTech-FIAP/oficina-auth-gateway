@@ -1,0 +1,28 @@
+meta {
+  name: Autenticar por CPF
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "cpf": "{{cpfAtivo}}"
+  }
+}
+
+script:post-response {
+  const token = res.getBody().token;
+  if (token) {
+    bru.setEnvVar("token", token);
+  }
+}
