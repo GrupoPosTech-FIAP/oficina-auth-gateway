@@ -11,10 +11,7 @@ interface AuthorizerResult {
 
 const PREFIXO_BEARER = "Bearer ";
 
-/**
- * Lambda Authorizer (REQUEST, simple response) do API Gateway HTTP API.
- * Só valida o JWT emitido pelo auth-handler; não toca no banco.
- */
+// Lambda Authorizer do tipo REQUEST com simple response (config em terraform/apigateway.tf).
 export async function handler(event: AuthorizerEvent): Promise<AuthorizerResult> {
   const cabecalho = event.headers?.authorization ?? event.headers?.Authorization;
 

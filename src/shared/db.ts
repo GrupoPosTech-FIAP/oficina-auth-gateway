@@ -51,10 +51,7 @@ export interface StatusCliente {
   ativo: boolean;
 }
 
-/**
- * Consulta a mesma tabela usada por oficina-app-api (ClienteJpaEntity):
- * "clientes", coluna "documento" (CPF/CNPJ sem máscara) e "ativo" (soft delete).
- */
+// Mesma tabela do oficina-app-api (ClienteJpaEntity): "ativo" é soft delete, não exclusão.
 export async function buscarStatusClientePorDocumento(documento: string): Promise<StatusCliente> {
   const conexao = await obterPool();
   const resultado = await conexao.query<{ ativo: boolean }>(
