@@ -1,0 +1,58 @@
+name: CI pipeline
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (compilar TypeScript)
+        run: npm run build
+
+      - name: Testes
+        run: npm test -- --coverage
+
+  terraform-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Formatação (terraform fmt)
+        run: terraform fmt -check -diff
+
+      - name: Inicializar sem backend (só para validar sintaxe)
+        run: terraform init -backend=false
+
+      - name: Criar zip placeholder (só existe pra "validate" checar a sintaxe)
+        run: mkdir -p ../build && touch ../build/lambda.zip
+
+      - name: Validar configuração
+        run: terraform validate
