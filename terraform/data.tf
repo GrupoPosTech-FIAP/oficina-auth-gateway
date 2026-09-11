@@ -6,7 +6,7 @@ data "terraform_remote_state" "infra" {
 
   config = {
     bucket = var.infra_state_bucket
-    key    = "global/s3/terraform.tfstate"
+    key    = "cluster/s3/terraform.tfstate"
     region = "us-east-1"
   }
 }
