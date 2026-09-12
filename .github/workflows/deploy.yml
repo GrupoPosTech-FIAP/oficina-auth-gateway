@@ -13,9 +13,6 @@ on:
       rds_endpoint:
         description: "Endpoint do RDS (terraform output -raw DB_Endpoint em oficina-infra-database)"
         required: true
-      rds_secret_arn:
-        description: "ARN do segredo com a senha do RDS (terraform output -raw DB_Secret_Arn em oficina-infra-database). Não é sensível, é só um identificador."
-        required: true
       app_api_base_url:
         description: "Hostname do LoadBalancer da oficina-app-api (kubectl get svc oficina-api -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
         required: true
@@ -74,7 +71,7 @@ jobs:
           terraform apply -auto-approve \
             -var="infra_state_bucket=${{ inputs.TF_BUCKET_NAME }}" \
             -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
-            -var="rds_secret_arn=${{ inputs.rds_secret_arn }}" \
+            -var="rds_password=${{ secrets.RDS_PASSWORD }}" \
             -var="rds_endpoint=${{ inputs.rds_endpoint }}" \
             -var="app_api_base_url=${{ inputs.app_api_base_url }}"
 

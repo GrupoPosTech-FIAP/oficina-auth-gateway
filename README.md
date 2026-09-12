@@ -87,10 +87,9 @@ O deploy é manual (workflow `Actions → CD - Deploy do Auth Gateway (AWS) → 
 
 - `TF_BUCKET_NAME` — bucket S3 do remote state (o mesmo usado por `oficina-infra-database`).
 - `rds_endpoint` — `terraform output -raw DB_Endpoint` rodado em `oficina-infra-database`.
-- `rds_secret_arn` — `terraform output -raw DB_Secret_Arn` rodado em `oficina-infra-database`. **Não é sensível**: o RDS usa `manage_master_user_password`, então a senha em si nunca sai do Secrets Manager — a Lambda `auth-handler` busca o valor em tempo de execução usando a role `LabRole`. Só o ARN (um identificador) circula por aqui.
 - `app_api_base_url` — `kubectl get svc oficina-api -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'`.
 
-Segredos compartilhados usados pelo workflow (GitHub Secrets do grupo): `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `JWT_SECRET`.
+Segredos compartilhados usados pelo workflow (GitHub Secrets do grupo): `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `JWT_SECRET`, `RDS_PASSWORD` (o mesmo usado pelo deploy de `oficina-infra-database` — o RDS usa senha estática via `db_password`, não Secrets Manager, então a Lambda `auth-handler` recebe usuário/senha direto como env vars `PGUSER`/`PGPASSWORD`).
 
 **Dependência externa:** o Security Group do RDS (em `oficina-infra-database`) precisa liberar ingress na porta 5432 vindo do Security Group da Lambda `auth-handler` (exportado aqui como output `Lambda_Security_Group_Id`). Sem isso, o `auth-handler` sobe mas não consegue consultar o banco.
 

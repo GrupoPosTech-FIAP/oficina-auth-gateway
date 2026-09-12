@@ -28,7 +28,8 @@ resource "aws_lambda_function" "auth_handler" {
       PGHOST                    = var.rds_endpoint
       PGPORT                    = "5432"
       PGDATABASE                = var.rds_database
-      RDS_SECRET_ARN            = var.rds_secret_arn
+      PGUSER                    = var.rds_username
+      PGPASSWORD                = var.rds_password
       RATE_LIMIT_TABLE          = aws_dynamodb_table.auth_rate_limit.name
       RATE_LIMIT_MAX_TENTATIVAS = var.rate_limit_max_tentativas
       RATE_LIMIT_WINDOW_SECONDS = var.rate_limit_window_seconds
