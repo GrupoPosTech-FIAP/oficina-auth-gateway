@@ -44,11 +44,18 @@ jobs:
           rm -rf node_modules
           npm ci --omit=dev
 
+      # CA oficial da AWS: o auth-handler valida o certificado do RDS com ela
+      # (rds.force_ssl=1 recusa conexao sem TLS). Fica na raiz do zip, do lado
+      # de shared/db.js, que a le em runtime.
+      - name: Baixar CA do RDS
+        run: curl -fsS -o rds-ca.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+
       - name: Empacotar Lambdas (dist/ + node_modules em build/lambda.zip)
         run: |
           mkdir -p build
           cd dist && zip -r ../build/lambda.zip . && cd ..
           zip -r build/lambda.zip node_modules
+          zip build/lambda.zip rds-ca.pem
 
       - name: Configurar credenciais AWS
         uses: aws-actions/configure-aws-credentials@v4
