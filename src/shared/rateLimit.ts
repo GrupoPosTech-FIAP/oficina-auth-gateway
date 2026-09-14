@@ -1,7 +1,11 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
-const cliente = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+// maxAttempts=1: sem retry, para o custo de uma falha nao multiplicar no timeout
+// da Lambda (ver TIMEOUT_MS abaixo).
+const cliente = DynamoDBDocumentClient.from(new DynamoDBClient({ maxAttempts: 1 }));
+
+const TIMEOUT_MS = 2000;
 
 export interface ResultadoLimite {
   permitido: boolean;
@@ -27,6 +31,11 @@ export async function registrarTentativa(ip: string): Promise<ResultadoLimite> {
   const agora = Math.floor(Date.now() / 1000);
   const expiraEm = agora + janelaSegundos;
 
+  // Aborta explicitamente: sem isso, uma chamada que nunca responde (rede da VPC
+  // sem rota para o DynamoDB) consome todo o timeout da Lambda e nunca cai no catch.
+  const controle = new AbortController();
+  const limite = setTimeout(() => controle.abort(), TIMEOUT_MS);
+
   try {
     const resultado = await cliente.send(
       new UpdateCommand({
@@ -35,7 +44,8 @@ export async function registrarTentativa(ip: string): Promise<ResultadoLimite> {
         UpdateExpression: "SET expira_em = if_not_exists(expira_em, :expiraEm) ADD tentativas :incr",
         ExpressionAttributeValues: { ":incr": 1, ":expiraEm": expiraEm },
         ReturnValues: "UPDATED_NEW",
-      })
+      }),
+      { abortSignal: controle.signal }
     );
 
     const tentativas = Number(resultado.Attributes?.tentativas ?? 0);
@@ -45,5 +55,7 @@ export async function registrarTentativa(ip: string): Promise<ResultadoLimite> {
     // só registra, já que o throttling do API Gateway segue como defesa.
     console.error("Falha ao registrar tentativa de autenticação no rate limiter", erro);
     return { permitido: true, tentativas: 0 };
+  } finally {
+    clearTimeout(limite);
   }
 }
