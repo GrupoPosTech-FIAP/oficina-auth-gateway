@@ -122,8 +122,17 @@ Segredos compartilhados usados pelo workflow (GitHub Secrets do grupo): `AWS_ACC
 
 ## Deploy ativo
 
-_(preencher após o primeiro `terraform apply`, com a URL retornada em `API_Gateway_URL`)_
+```
+https://k4jdnxnc4a.execute-api.us-east-1.amazonaws.com
+```
 
+Exemplo de uso (CPF do cliente "Ana Souza", semeado pelo `DevDataLoader` da `oficina-app-api`):
+
+```bash
+curl -X POST https://k4jdnxnc4a.execute-api.us-east-1.amazonaws.com/auth \
+  -H "Content-Type: application/json" \
+  -d '{"cpf":"52998224725"}'
+# {"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
 ```
-https://<preencher>.execute-api.us-east-1.amazonaws.com
-```
+
+> A URL muda a cada recriação do API Gateway. Como o AWS Academy Learner Lab reseta a conta entre sessões (inclusive apagando o bucket do Terraform state), espere reprovisionar a stack e atualizar este endereço. A sequência de deploy dos quatro repositórios está descrita em [`docs/ordem-de-deploy.md`](docs/ordem-de-deploy.md).
