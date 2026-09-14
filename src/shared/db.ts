@@ -1,6 +1,17 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import { Pool } from "pg";
 
 let pool: Pool | undefined;
+
+// O RDS usa rds.force_ssl=1 (padrao no Postgres 15) e recusa conexao sem TLS
+// com "no pg_hba.conf entry ... no encryption". O driver JDBC da oficina-app-api
+// nao sofre disso porque usa sslmode=prefer; o pg nao tenta TLS por padrao.
+// A CA oficial da AWS vai no zip (ver workflow de deploy) para validar o
+// certificado do servidor, em vez de so aceitar qualquer um.
+function configurarSsl() {
+  return { ca: readFileSync(join(__dirname, "..", "rds-ca.pem"), "utf8") };
+}
 
 function obterPool(): Pool {
   if (!pool) {
@@ -10,6 +21,7 @@ function obterPool(): Pool {
       database: process.env.PGDATABASE,
       user: process.env.PGUSER,
       password: process.env.PGPASSWORD,
+      ssl: configurarSsl(),
       max: 1,
     });
   }
