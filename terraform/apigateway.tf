@@ -118,11 +118,15 @@ resource "aws_apigatewayv2_integration" "app_api_proxy" {
   payload_format_version = "1.0"
 
   # O Authorization e credencial DESTE gateway, ja consumida pelo authorizer.
-  # Repassada adiante, o Spring Security da oficina-app-api tenta valida-la como
-  # token de usuario interno (os dois fluxos compartilham o JWT_SECRET) e responde
-  # 403 - inclusive em rota publica, porque o filtro roda antes do permitAll.
+  # Repassada adiante, o JwtAuthenticationFilter da oficina-app-api consegue
+  # parsear o token (os dois fluxos compartilham o JWT_SECRET), usa o "sub" - um
+  # CPF - como e-mail no loadUserByUsername e estoura UsernameNotFoundException,
+  # virando 403 mesmo em rota publica.
+  # Sobrescrevemos em vez de remover porque "remove:" exige valor vazio, que o
+  # provider Terraform converte em null e a AWS descarta. O filtro citado ignora
+  # qualquer header que nao comece com "Bearer ", entao isto o faz seguir anonimo.
   request_parameters = {
-    "remove:header.Authorization" = ""
+    "overwrite:header.Authorization" = "consumido-pelo-gateway"
   }
 }
 
