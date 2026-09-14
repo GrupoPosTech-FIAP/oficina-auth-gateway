@@ -116,6 +116,14 @@ resource "aws_apigatewayv2_integration" "app_api_proxy" {
   integration_method     = "ANY"
   integration_uri        = "http://${var.app_api_base_url}:8080/{proxy}"
   payload_format_version = "1.0"
+
+  # O Authorization e credencial DESTE gateway, ja consumida pelo authorizer.
+  # Repassada adiante, o Spring Security da oficina-app-api tenta valida-la como
+  # token de usuario interno (os dois fluxos compartilham o JWT_SECRET) e responde
+  # 403 - inclusive em rota publica, porque o filtro roda antes do permitAll.
+  request_parameters = {
+    "remove:header.Authorization" = ""
+  }
 }
 
 resource "aws_apigatewayv2_route" "protected_proxy" {
