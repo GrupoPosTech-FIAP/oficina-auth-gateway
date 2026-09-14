@@ -63,9 +63,26 @@ Repassa a requisição para a `oficina-app-api`, exigindo `Authorization: Bearer
 | Token inválido ou expirado | `403` | authorizer nega (`{"message":"Forbidden"}`) |
 | Token válido | repassa | integração HTTP para a `oficina-app-api` |
 
-O header `Authorization` **não** é repassado adiante: ele é a credencial deste gateway e já foi consumida pelo authorizer. Se fosse repassado, o Spring Security da `oficina-app-api` tentaria validá-lo como token de usuário interno — os dois fluxos compartilham o `JWT_SECRET` — e responderia `403` mesmo em rota pública, porque o filtro JWT roda antes das regras de `permitAll`.
+### Limitação conhecida: o token de cliente atravessa até a `oficina-app-api`
 
-Vale notar o que isso **não** resolve: as rotas de negócio da `oficina-app-api` seguem exigindo a autenticação interna dela (perfis `ADMIN`/`ATENDENTE`/`MECANICO`). O gateway garante que só um cliente com CPF válido e ativo atravessa a borda; ele não emite credencial de usuário interno.
+Depois de aprovado pelo authorizer, a requisição é repassada **com o header `Authorization` original**. Isso hoje faz a `oficina-app-api` responder `403` — inclusive em rotas que ela declara como `permitAll`, como `/actuator/health`.
+
+A causa é o `JWT_SECRET` ser um secret de organização compartilhado por dois domínios de token distintos: os usuários internos da `oficina-app-api` (`ADMIN`/`ATENDENTE`/`MECANICO`) e os clientes autenticados por CPF aqui. No `JwtAuthenticationFilter` da aplicação:
+
+```java
+if (authHeader == null || !authHeader.startsWith("Bearer ")) { /* segue anônimo */ }
+try { email = jwtService.extrairEmail(token); }
+catch (Exception e) { /* segue anônimo */ }
+UserDetails userDetails = userDetailsService.loadUserByUsername(email);  // estoura
+```
+
+Como a chave é a mesma, `extrairEmail` **consegue** parsear o token de cliente e devolve o `sub` — um CPF. O `loadUserByUsername` não encontra usuário com esse "e-mail", lança `UsernameNotFoundException` (não capturada ali) e o resultado é `403`.
+
+Não é possível resolver removendo o header na borda: a AWS recusa parameter mapping em `Authorization` com `Operations on header authorization are restricted`, tanto para `remove:` quanto para `overwrite:`.
+
+**Correção recomendada:** usar um secret próprio para o fluxo de cliente (ex.: `JWT_SECRET_CLIENTE`), em vez de reaproveitar o `JWT_SECRET`. Aí o token repassado falha na validação de assinatura, cai no `catch` do filtro e a requisição segue anônima — sem depender de nenhum truque na borda. Separar chaves entre domínios de token é a prática correta de qualquer forma; exige apenas criar o novo secret na organização.
+
+Independente disso, vale registrar o que o gateway **não** se propõe a resolver: as rotas de negócio da `oficina-app-api` seguem exigindo a autenticação interna dela. O gateway garante que só um cliente com CPF válido e ativo atravessa a borda; ele não emite credencial de usuário interno.
 
 Uma coleção Bruno com exemplos de request para as duas rotas fica em [`test/bruno/`](test/bruno), no mesmo formato usado pela `oficina-app-api`.
 
