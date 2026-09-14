@@ -55,7 +55,17 @@ flowchart LR
 
 ### Rotas protegidas — `ANY /app/{proxy+}`
 
-Repassa a requisição para a `oficina-app-api`, exigindo `Authorization: Bearer <token>` válido (emitido por `POST /auth`). Token ausente/inválido/expirado → `401`, sem chegar na aplicação.
+Repassa a requisição para a `oficina-app-api`, exigindo `Authorization: Bearer <token>` válido (emitido por `POST /auth`). Nada chega na aplicação sem token válido:
+
+| Situação | Status | Origem |
+|---|---|---|
+| Header `Authorization` ausente | `401` | API Gateway, antes de invocar o authorizer |
+| Token inválido ou expirado | `403` | authorizer nega (`{"message":"Forbidden"}`) |
+| Token válido | repassa | integração HTTP para a `oficina-app-api` |
+
+O header `Authorization` **não** é repassado adiante: ele é a credencial deste gateway e já foi consumida pelo authorizer. Se fosse repassado, o Spring Security da `oficina-app-api` tentaria validá-lo como token de usuário interno — os dois fluxos compartilham o `JWT_SECRET` — e responderia `403` mesmo em rota pública, porque o filtro JWT roda antes das regras de `permitAll`.
+
+Vale notar o que isso **não** resolve: as rotas de negócio da `oficina-app-api` seguem exigindo a autenticação interna dela (perfis `ADMIN`/`ATENDENTE`/`MECANICO`). O gateway garante que só um cliente com CPF válido e ativo atravessa a borda; ele não emite credencial de usuário interno.
 
 Uma coleção Bruno com exemplos de request para as duas rotas fica em [`test/bruno/`](test/bruno), no mesmo formato usado pela `oficina-app-api`.
 
