@@ -117,17 +117,10 @@ resource "aws_apigatewayv2_integration" "app_api_proxy" {
   integration_uri        = "http://${var.app_api_base_url}:8080/{proxy}"
   payload_format_version = "1.0"
 
-  # O Authorization e credencial DESTE gateway, ja consumida pelo authorizer.
-  # Repassada adiante, o JwtAuthenticationFilter da oficina-app-api consegue
-  # parsear o token (os dois fluxos compartilham o JWT_SECRET), usa o "sub" - um
-  # CPF - como e-mail no loadUserByUsername e estoura UsernameNotFoundException,
-  # virando 403 mesmo em rota publica.
-  # Sobrescrevemos em vez de remover porque "remove:" exige valor vazio, que o
-  # provider Terraform converte em null e a AWS descarta. O filtro citado ignora
-  # qualquer header que nao comece com "Bearer ", entao isto o faz seguir anonimo.
-  request_parameters = {
-    "overwrite:header.Authorization" = "consumido-pelo-gateway"
-  }
+  # Nao tente mexer no header Authorization aqui: a AWS recusa o parameter
+  # mapping com "Operations on header authorization are restricted", tanto para
+  # "remove:" quanto para "overwrite:". Por isso ele segue sendo repassado para
+  # a oficina-app-api - ver a limitacao conhecida no README.
 }
 
 resource "aws_apigatewayv2_route" "protected_proxy" {
