@@ -10,16 +10,33 @@ interface AuthorizerResult {
 }
 
 const PREFIXO_BEARER = "Bearer ";
+const DEFAULT_AUTH_HEADER = "x-gateway-auth";
 
 // Lambda Authorizer do tipo REQUEST com simple response (config em terraform/apigateway.tf).
 export async function handler(event: AuthorizerEvent): Promise<AuthorizerResult> {
-  const cabecalho = event.headers?.authorization ?? event.headers?.Authorization;
+  const targetHeader = (process.env.GATEWAY_AUTH_HEADER || DEFAULT_AUTH_HEADER).toLowerCase();
 
-  if (!cabecalho || !cabecalho.startsWith(PREFIXO_BEARER)) {
+  let cabecalho: string | undefined;
+  if (event.headers) {
+    for (const [key, value] of Object.entries(event.headers)) {
+      if (key.toLowerCase() === targetHeader && value) {
+        cabecalho = value;
+        break;
+      }
+    }
+  }
+
+  if (!cabecalho) {
     return { isAuthorized: false };
   }
 
-  const token = cabecalho.slice(PREFIXO_BEARER.length);
+  const token = cabecalho.startsWith(PREFIXO_BEARER)
+    ? cabecalho.slice(PREFIXO_BEARER.length).trim()
+    : cabecalho.trim();
+
+  if (!token) {
+    return { isAuthorized: false };
+  }
 
   try {
     const payload = validarToken(token);

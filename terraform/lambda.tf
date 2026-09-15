@@ -52,7 +52,8 @@ resource "aws_lambda_function" "authorizer" {
   # (evita o cold start extra de anexar uma ENI).
   environment {
     variables = {
-      JWT_SECRET = var.jwt_secret
+      JWT_SECRET          = var.jwt_secret
+      GATEWAY_AUTH_HEADER = var.gateway_auth_header
     }
   }
 
