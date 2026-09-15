@@ -13,7 +13,7 @@ Não é necessária nenhuma alteração na `oficina-app-api` — toda a validaç
 flowchart LR
     Cliente((Cliente\ncom CPF))
     Cliente -->|POST /auth cpf| APIGW[AWS API Gateway\nHTTP API]
-    Cliente -->|Authorization Bearer JWT| APIGW
+    Cliente -->|x-gateway-auth JWT| APIGW
 
     APIGW -->|integracao Lambda| AuthFn[Lambda: auth-handler]
     APIGW -->|Lambda Authorizer| AuthzFn[Lambda: authorizer]
@@ -25,7 +25,7 @@ flowchart LR
 ```
 
 - **`auth-handler`**: valida o formato do CPF, consulta a tabela `clientes` (mesmo RDS Postgres usado pela `oficina-app-api`) e, se o cliente existir e estiver ativo, assina um JWT.
-- **`authorizer`**: Lambda Authorizer (REQUEST, simple response) que valida a assinatura/expiração do JWT recebido em `Authorization: Bearer <token>` antes de liberar o proxy até a `oficina-app-api`.
+- **`authorizer`**: Lambda Authorizer (REQUEST, simple response) que valida a assinatura/expiração do JWT recebido no header customizado `x-gateway-auth` (aceitando tanto o token puro quanto `Bearer <token>`) antes de liberar o proxy até a `oficina-app-api`.
 - A rede (VPC, sub-redes) e o Security Group do RDS são reaproveitados dos repositórios [`oficina-infra-cluster`](https://github.com/GrupoPosTech-FIAP/oficina-infra-cluster) e [`oficina-infra-database`](https://github.com/GrupoPosTech-FIAP/oficina-infra-database) via Terraform remote state — nada de infraestrutura duplicada.
 
 ## Tecnologias
@@ -55,34 +55,21 @@ flowchart LR
 
 ### Rotas protegidas — `ANY /app/{proxy+}`
 
-Repassa a requisição para a `oficina-app-api`, exigindo `Authorization: Bearer <token>` válido (emitido por `POST /auth`). Nada chega na aplicação sem token válido:
+Repassa a requisição para a `oficina-app-api`, exigindo o cabeçalho `x-gateway-auth: <token>` válido (emitido por `POST /auth`). O authorizer aceita tanto o token puro (`x-gateway-auth: <jwt>`) quanto com prefixo (`x-gateway-auth: Bearer <jwt>`). Nada chega na aplicação sem token válido:
 
 | Situação | Status | Origem |
 |---|---|---|
-| Header `Authorization` ausente | `401` | API Gateway, antes de invocar o authorizer |
+| Header `x-gateway-auth` ausente | `401` | API Gateway, antes de invocar o authorizer |
 | Token inválido ou expirado | `403` | authorizer nega (`{"message":"Forbidden"}`) |
 | Token válido | repassa | integração HTTP para a `oficina-app-api` |
 
-### Limitação conhecida: o token de cliente atravessa até a `oficina-app-api`
+### Isolamento de cabeçalho: por que usamos `x-gateway-auth` em vez de `Authorization`?
 
-Depois de aprovado pelo authorizer, a requisição é repassada **com o header `Authorization` original**. Isso hoje faz a `oficina-app-api` responder `403` — inclusive em rotas que ela declara como `permitAll`, como `/actuator/health`.
+O API Gateway HTTP API v2 repassa os cabeçalhos recebidos para a aplicação de backend (`oficina-app-api`). Se usássemos o cabeçalho padrão `Authorization` na borda, a `oficina-app-api` tentaria validar o token com seu próprio filtro interno (`JwtAuthenticationFilter`), onde o CPF do cliente em `sub` dispararia falha no `loadUserByUsername` resultando em `403 Forbidden` (além da AWS proibir parameter mapping em `Authorization`).
 
-A causa é o `JWT_SECRET` ser um secret de organização compartilhado por dois domínios de token distintos: os usuários internos da `oficina-app-api` (`ADMIN`/`ATENDENTE`/`MECANICO`) e os clientes autenticados por CPF aqui. No `JwtAuthenticationFilter` da aplicação:
-
-```java
-if (authHeader == null || !authHeader.startsWith("Bearer ")) { /* segue anônimo */ }
-try { email = jwtService.extrairEmail(token); }
-catch (Exception e) { /* segue anônimo */ }
-UserDetails userDetails = userDetailsService.loadUserByUsername(email);  // estoura
-```
-
-Como a chave é a mesma, `extrairEmail` **consegue** parsear o token de cliente e devolve o `sub` — um CPF. O `loadUserByUsername` não encontra usuário com esse "e-mail", lança `UsernameNotFoundException` (não capturada ali) e o resultado é `403`.
-
-Não é possível resolver removendo o header na borda: a AWS recusa parameter mapping em `Authorization` com `Operations on header authorization are restricted`, tanto para `remove:` quanto para `overwrite:`.
-
-**Correção recomendada:** usar um secret próprio para o fluxo de cliente (ex.: `JWT_SECRET_CLIENTE`), em vez de reaproveitar o `JWT_SECRET`. Aí o token repassado falha na validação de assinatura, cai no `catch` do filtro e a requisição segue anônima — sem depender de nenhum truque na borda. Separar chaves entre domínios de token é a prática correta de qualquer forma; exige apenas criar o novo secret na organização.
-
-Independente disso, vale registrar o que o gateway **não** se propõe a resolver: as rotas de negócio da `oficina-app-api` seguem exigindo a autenticação interna dela. O gateway garante que só um cliente com CPF válido e ativo atravessa a borda; ele não emite credencial de usuário interno.
+Ao utilizar o cabeçalho dedicado `x-gateway-auth`:
+1. O API Gateway consome e valida o JWT do cliente na borda;
+2. O cabeçalho padrão `Authorization` fica totalmente livre e desacoplado para a `oficina-app-api` (permitindo rotas anônimas/públicas ou o uso de credenciais internas de funcionários sem conflitos).
 
 Uma coleção Bruno com exemplos de request para as duas rotas fica em [`test/bruno/`](test/bruno), no mesmo formato usado pela `oficina-app-api`.
 

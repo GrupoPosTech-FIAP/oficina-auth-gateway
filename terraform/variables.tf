@@ -54,3 +54,9 @@ variable "rate_limit_window_seconds" {
   type        = string
   default     = "300"
 }
+
+variable "gateway_auth_header" {
+  description = "Nome do cabecalho HTTP customizado usado pelo API Gateway Authorizer para validar o JWT do cliente"
+  type        = string
+  default     = "x-gateway-auth"
+}

@@ -100,7 +100,7 @@ resource "aws_apigatewayv2_authorizer" "cliente_jwt" {
   name                              = "cliente-jwt-authorizer"
   authorizer_payload_format_version = "2.0"
   enable_simple_responses           = true
-  identity_sources                  = ["$request.header.Authorization"]
+  identity_sources                  = ["$request.header.${var.gateway_auth_header}"]
   # ttl 0: cada requisicao revalida o token (evita cachear uma decisao de
   # autorizacao por mais tempo do que o necessario num ambiente de estudo).
   authorizer_result_ttl_in_seconds = 0
