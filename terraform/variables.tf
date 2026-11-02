@@ -43,6 +43,12 @@ variable "app_api_base_url" {
   type        = string
 }
 
+variable "billing_service_base_url" {
+  description = "Hostname do LoadBalancer da oficina-billing-service no EKS (kubectl get svc oficina-billing -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'). Opcional: vazio se ainda nao publicado."
+  type        = string
+  default     = ""
+}
+
 variable "rate_limit_max_tentativas" {
   description = "Numero maximo de chamadas a POST /auth aceitas por IP dentro da janela (rate_limit_window_seconds) antes de responder 429"
   type        = string

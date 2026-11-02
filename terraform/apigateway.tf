@@ -130,3 +130,33 @@ resource "aws_apigatewayv2_route" "protected_proxy" {
   authorization_type = "CUSTOM"
   authorizer_id      = aws_apigatewayv2_authorizer.cliente_jwt.id
 }
+
+# --- Rotas do oficina-billing-service no EKS ---
+
+resource "aws_apigatewayv2_integration" "billing_api_proxy" {
+  count                  = var.billing_service_base_url != "" ? 1 : 0
+  api_id                 = aws_apigatewayv2_api.auth_gateway.id
+  integration_type       = "HTTP_PROXY"
+  integration_method     = "ANY"
+  integration_uri        = "http://${var.billing_service_base_url}:8082/{proxy}"
+  payload_format_version = "1.0"
+}
+
+# Rota protegida: proxy para chamadas de orçamentos e cobranças
+resource "aws_apigatewayv2_route" "billing_protected_proxy" {
+  count              = var.billing_service_base_url != "" ? 1 : 0
+  api_id             = aws_apigatewayv2_api.auth_gateway.id
+  route_key          = "ANY /billing/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.billing_api_proxy[0].id}"
+  authorization_type = "CUSTOM"
+  authorizer_id      = aws_apigatewayv2_authorizer.cliente_jwt.id
+}
+
+# Rota pública: Webhooks do Mercado Pago (validação HMAC-SHA256 no microsserviço)
+resource "aws_apigatewayv2_route" "billing_webhook" {
+  count     = var.billing_service_base_url != "" ? 1 : 0
+  api_id    = aws_apigatewayv2_api.auth_gateway.id
+  route_key = "POST /webhooks/mercadopago"
+  target    = "integrations/${aws_apigatewayv2_integration.billing_api_proxy[0].id}"
+}
+
