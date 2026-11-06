@@ -160,3 +160,23 @@ resource "aws_apigatewayv2_route" "billing_webhook" {
   target    = "integrations/${aws_apigatewayv2_integration.billing_api_proxy[0].id}"
 }
 
+# --- Rotas do oficina-inventory-service no EKS ---
+
+resource "aws_apigatewayv2_integration" "inventory_api_proxy" {
+  count                  = var.inventory_service_base_url != "" ? 1 : 0
+  api_id                 = aws_apigatewayv2_api.auth_gateway.id
+  integration_type       = "HTTP_PROXY"
+  integration_method     = "ANY"
+  integration_uri        = "http://${var.inventory_service_base_url}:8083/{proxy}"
+  payload_format_version = "1.0"
+}
+
+# Rota protegida: proxy para chamadas de insumos e controle de estoque
+resource "aws_apigatewayv2_route" "inventory_protected_proxy" {
+  count              = var.inventory_service_base_url != "" ? 1 : 0
+  api_id             = aws_apigatewayv2_api.auth_gateway.id
+  route_key          = "ANY /inventory/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.inventory_api_proxy[0].id}"
+  authorization_type = "CUSTOM"
+  authorizer_id      = aws_apigatewayv2_authorizer.cliente_jwt.id
+}

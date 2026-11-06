@@ -49,6 +49,12 @@ variable "billing_service_base_url" {
   default     = ""
 }
 
+variable "inventory_service_base_url" {
+  description = "Hostname do LoadBalancer da oficina-inventory-service no EKS (kubectl get svc oficina-inventory -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'). Opcional: vazio se ainda nao publicado."
+  type        = string
+  default     = ""
+}
+
 variable "rate_limit_max_tentativas" {
   description = "Numero maximo de chamadas a POST /auth aceitas por IP dentro da janela (rate_limit_window_seconds) antes de responder 429"
   type        = string
