@@ -189,3 +189,45 @@ resource "aws_apigatewayv2_route" "inventory_protected_proxy" {
   authorization_type = "CUSTOM"
   authorizer_id      = aws_apigatewayv2_authorizer.cliente_jwt.id
 }
+
+# --- Rotas do oficina-execution-service no EKS ---
+
+resource "aws_apigatewayv2_integration" "execution_api_proxy" {
+  count                  = var.execution_service_base_url != "" ? 1 : 0
+  api_id                 = aws_apigatewayv2_api.auth_gateway.id
+  integration_type       = "HTTP_PROXY"
+  integration_method     = "ANY"
+  integration_uri        = "http://${var.execution_service_base_url}:8084/{proxy}"
+  payload_format_version = "1.0"
+}
+
+# Rota protegida: proxy para chamadas de execução de OS
+resource "aws_apigatewayv2_route" "execution_protected_proxy" {
+  count              = var.execution_service_base_url != "" ? 1 : 0
+  api_id             = aws_apigatewayv2_api.auth_gateway.id
+  route_key          = "ANY /execution/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.execution_api_proxy[0].id}"
+  authorization_type = "CUSTOM"
+  authorizer_id      = aws_apigatewayv2_authorizer.cliente_jwt.id
+}
+
+# --- Rotas do oficina-customer-service no EKS ---
+
+resource "aws_apigatewayv2_integration" "customer_api_proxy" {
+  count                  = var.customer_service_base_url != "" ? 1 : 0
+  api_id                 = aws_apigatewayv2_api.auth_gateway.id
+  integration_type       = "HTTP_PROXY"
+  integration_method     = "ANY"
+  integration_uri        = "http://${var.customer_service_base_url}:8084/{proxy}"
+  payload_format_version = "1.0"
+}
+
+# Rota protegida: proxy para chamadas de clientes
+resource "aws_apigatewayv2_route" "customer_protected_proxy" {
+  count              = var.customer_service_base_url != "" ? 1 : 0
+  api_id             = aws_apigatewayv2_api.auth_gateway.id
+  route_key          = "ANY /customer/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.customer_api_proxy[0].id}"
+  authorization_type = "CUSTOM"
+  authorizer_id      = aws_apigatewayv2_authorizer.cliente_jwt.id
+}
