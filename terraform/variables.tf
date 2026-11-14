@@ -55,6 +55,18 @@ variable "inventory_service_base_url" {
   default     = ""
 }
 
+variable "execution_service_base_url" {
+  description = "Hostname do LoadBalancer da oficina-execution-service no EKS (kubectl get svc oficina-execution -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'). Opcional: vazio se ainda nao publicado."
+  type        = string
+  default     = ""
+}
+
+variable "customer_service_base_url" {
+  description = "Hostname do LoadBalancer da oficina-customer-service no EKS (kubectl get svc oficina-customer -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'). Opcional: vazio se ainda nao publicado."
+  type        = string
+  default     = ""
+}
+
 variable "rate_limit_max_tentativas" {
   description = "Numero maximo de chamadas a POST /auth aceitas por IP dentro da janela (rate_limit_window_seconds) antes de responder 429"
   type        = string

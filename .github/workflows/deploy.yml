@@ -24,6 +24,14 @@ on:
         description: "Hostname do LoadBalancer da oficina-inventory-service (kubectl get svc oficina-inventory -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'). Opcional."
         required: false
         default: ""
+      execution_service_base_url:
+        description: "Hostname do LoadBalancer da oficina-execution-service (kubectl get svc oficina-execution -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'). Opcional."
+        required: false
+        default: ""
+      customer_service_base_url:
+        description: "Hostname do LoadBalancer da oficina-customer-service (kubectl get svc oficina-customer -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'). Opcional."
+        required: false
+        default: ""
 
 env:
   AWS_REGION: us-east-1
@@ -90,7 +98,9 @@ jobs:
             -var="rds_endpoint=${{ inputs.rds_endpoint }}" \
             -var="app_api_base_url=${{ inputs.app_api_base_url }}" \
             -var="billing_service_base_url=${{ inputs.billing_service_base_url }}" \
-            -var="inventory_service_base_url=${{ inputs.inventory_service_base_url }}"
+            -var="inventory_service_base_url=${{ inputs.inventory_service_base_url }}" \
+            -var="execution_service_base_url=${{ inputs.execution_service_base_url }}" \
+            -var="customer_service_base_url=${{ inputs.customer_service_base_url }}"
 
       - name: Mostrar URL do API Gateway
         working-directory: terraform
